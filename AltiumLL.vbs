@@ -13,6 +13,7 @@ Dim decChar
 ' AIAAAUOA A IA?AEI OAEEA (n?aae a?oaeo Dim):
 Dim Current3D_URL
 Dim CurrentPartID_for3D
+Dim SchComponentAdded
 
 
 AppVersion = "2.2"
@@ -454,30 +455,45 @@ Sub AssignSTEPmodel(STEPFileName, RotX, RotY, RotZ, X, Y, Z)
     Dim footprint
 
     Set PCBLib = PCBServer.GetCurrentPCBLibrary
+    If PCBLib Is Nothing Then
+        DebugLog "[ERROR] PCBLib is Nothing in AssignSTEPmodel"
+        Exit Sub
+    End If
     Set footprint = PCBLib.CurrentComponent
+    If footprint Is Nothing Then
+        DebugLog "[ERROR] CurrentComponent is Nothing in AssignSTEPmodel"
+        Exit Sub
+    End If
 
-    ' КРИТИЧНО: используем Set для объектов!
+    ' Create STEP model and register it
+    PCBServer.PreProcess
     Set STEPmodel = PCBServer.PCBObjectFactory(eComponentBodyObject,eNoDimension,eCreate_Default)
     Set Model = STEPmodel.ModelFactory_FromFilename(STEPFileName, false)
+    If Model Is Nothing Then
+        DebugLog "[ERROR] STEP model load failed: " & STEPFileName
+        PCBServer.PostProcess
+        Exit Sub
+    End If
 
     X = replace(X,".",decChar)
     Y = replace(Y,".",decChar)
     Z = replace(Z,".",decChar)
 
-    ' Устанавливаем параметры модели
+    ' Apply transforms
     Model.SetState RotX,RotY,RotZ,mmstocoord(z)
     STEPmodel.Model = Model
 
-    ' Добавляем модель к текущему футпринту
+    ' Add model to footprint
     footprint.AddPCBObject(STEPmodel)
+    PCBServer.SendMessageToRobots footprint.I_ObjectAddress,c_Broadcast,PCBM_BoardRegisteration,STEPmodel.I_ObjectAddress
     DebugLog "[105] 3D model ADDED"
 
-    ' Позиционируем модель
+    ' Move model
     STEPmodel.MoveByXY mmstocoord(x), mmstocoord(y)
 
-    
+    footprint.GraphicallyInvalidate
     PCBServer.PostProcess
-    
+
 End Sub
 
 Sub CreateComponentInLib(Name,Description,RefDes)
@@ -514,6 +530,17 @@ Sub CreateComponentInLib(Name,Description,RefDes)
     SchComponent.ComponentDescription = Description
 
 
+End Sub
+
+Sub EnsureSchComponentAdded()
+    If SchComponentAdded Then Exit Sub
+    If SCHLib Is Nothing Then Exit Sub
+    If SchComponent Is Nothing Then Exit Sub
+    SCHLib.AddSchComponent(SchComponent)
+    DebugLog "[400] Component added to library"
+    SchServer.RobotManager.SendMessage nil, c_BroadCast, SCHM_PrimitiveRegistration, SchComponent.I_ObjectAddress
+    SCHLib.GraphicallyInvalidate
+    SchComponentAdded = True
 End Sub
 
 
@@ -941,6 +968,7 @@ Sub ProcessCB(filename)
 
     AddPCB = true
     AddSCH = true
+    SchComponentAdded = False
 
     Dim loopCounter
     loopCounter = 0
@@ -1040,6 +1068,7 @@ Sub ProcessCB(filename)
              SchComponent.Designator.Text = lineArray(3)
              SchComponent.ComponentDescription = lineArray(2)
              DebugLog "[208] Component parameters set"
+             EnsureSchComponentAdded
           End if
        ElseIf lineArray(0) = "CreateLeftPin" And AddSCH Then
           CreateLeftPin lineArray(1), lineArray(2), lineArray(3), lineArray(4), lineArray(5), CInt(lineArray(6)), CInt(lineArray(7))
@@ -1079,13 +1108,7 @@ Sub ProcessCB(filename)
     'FinaliseComponentInLib
     'Set SCHLib = SchServer.GetCurrentSchDocument
     If AddSCH Then
-       SCHLib.AddSchComponent(SchComponent)
-       DebugLog "[400] Component added to library"
-    'Send a system notification that a new component has been added to the library.
-       SchServer.RobotManager.SendMessage nil, c_BroadCast, SCHM_PrimitiveRegistration, SchComponent.I_ObjectAddress
-    'SCHLib.CurrentSchComponent = SchComponent
-    'Refresh library.
-       SCHLib.GraphicallyInvalidate
+       EnsureSchComponentAdded
        SchLibDoc.DoFileSave("SchLib")
        DebugLog "[403] SchLib SAVED!"
     End If
@@ -1556,10 +1579,10 @@ Function AddSchLib(component)
     LibraryIterator.AddFilter_ObjectSet(MkSet(eSchComponent))
     Set LibComp = LibraryIterator.FirstSchObject
     
-    ' ВАЖНО: проверяем, есть ли хоть один компонент (библиотека может быть пустой)
+    ' Г‚ГЂГ†ГЌГЋ: ГЇГ°Г®ГўГҐГ°ГїГҐГ¬, ГҐГ±ГІГј Г«ГЁ ГµГ®ГІГј Г®Г¤ГЁГ­ ГЄГ®Г¬ГЇГ®Г­ГҐГ­ГІ (ГЎГЁГЎГ«ГЁГ®ГІГҐГЄГ  Г¬Г®Г¦ГҐГІ ГЎГ»ГІГј ГЇГіГ±ГІГ®Г©)
     If LibComp Is Nothing Then
         CurrentLib.SchIterator_Destroy(LibraryIterator)
-        AddSchLib = True  ' Библиотека пустая, можно добавлять
+        AddSchLib = True  ' ГЃГЁГЎГ«ГЁГ®ГІГҐГЄГ  ГЇГіГ±ГІГ Гї, Г¬Г®Г¦Г­Г® Г¤Г®ГЎГ ГўГ«ГїГІГј
         Exit Function
     End If
     
@@ -1569,16 +1592,16 @@ Function AddSchLib(component)
        LibCompNamePrev = LibCompNameNext
        If LibCompNameNext = component Then
           CurrentLib.SchIterator_Destroy(LibraryIterator)
-          AddSchLib = False  ' Компонент уже существует
+          AddSchLib = False  ' ГЉГ®Г¬ГЇГ®Г­ГҐГ­ГІ ГіГ¦ГҐ Г±ГіГ№ГҐГ±ГІГўГіГҐГІ
           Exit Function
        End If
        Set LibComp = LibraryIterator.NextSchObject
-       If LibComp Is Nothing Then Exit Do  ' Конец списка
+       If LibComp Is Nothing Then Exit Do  ' ГЉГ®Г­ГҐГ¶ Г±ГЇГЁГ±ГЄГ 
        LibCompNameNext = LibComp.LibReference
     Loop Until LibCompNameNext = LibCompNamePrev
     
     CurrentLib.SchIterator_Destroy(LibraryIterator)
-    AddSchLib = True  ' Компонент не найден, можно добавлять
+    AddSchLib = True  ' ГЉГ®Г¬ГЇГ®Г­ГҐГ­ГІ Г­ГҐ Г­Г Г©Г¤ГҐГ­, Г¬Г®Г¦Г­Г® Г¤Г®ГЎГ ГўГ«ГїГІГј
 End Function
 
 Sub chk_ShowInstructionClick(Sender)
