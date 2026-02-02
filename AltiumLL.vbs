@@ -1109,8 +1109,21 @@ Sub ProcessCB(filename)
     'Set SCHLib = SchServer.GetCurrentSchDocument
     If AddSCH Then
        EnsureSchComponentAdded
-       SchLibDoc.DoFileSave("SchLib")
-       DebugLog "[403] SchLib SAVED!"
+       If SchLibDoc Is Nothing Then
+          DebugLog "[ERROR] SchLibDoc is Nothing at save time"
+       Else
+          SchLibDoc.DoFileSave("SchLib")
+          DebugLog "[403] SchLib SAVED!"
+       End If
+    End If
+
+    If AddPCB Then
+       If PcbLibDoc Is Nothing Then
+          DebugLog "[ERROR] PcbLibDoc is Nothing at save time"
+       Else
+          PcbLibDoc.DoFileSave("PcbLib")
+          DebugLog "[204] PcbLib SAVED (final)"
+       End If
     End If
 
 
@@ -2801,4 +2814,3 @@ outputStr = objRegExp.Replace(strtoclean,"_")
 
 strClean = outputStr
 End Function
-
