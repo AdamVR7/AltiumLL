@@ -456,7 +456,14 @@ Sub AssignSTEPmodel(STEPFileName, RotX, RotY, RotZ, X, Y, Z)
     Set PCBLib = PCBServer.GetCurrentPCBLibrary
     Set footprint = PCBLib.CurrentComponent
 
-    ' КРИТИЧНО: используем Set для объектов!
+    If Model Is Nothing Then
+        DebugLog "[ERROR 101] 3D model load failed for: " & STEPFileName
+        Exit Sub
+    End If
+    RotX = replace(RotX,".",decChar)
+    RotY = replace(RotY,".",decChar)
+    RotZ = replace(RotZ,".",decChar)
+    ' ГЉГђГ€Г’Г€Г—ГЌГЋ: ГЁГ±ГЇГ®Г«ГјГ§ГіГҐГ¬ Set Г¤Г«Гї Г®ГЎГєГҐГЄГІГ®Гў!
     Set STEPmodel = PCBServer.PCBObjectFactory(eComponentBodyObject,eNoDimension,eCreate_Default)
     Set Model = STEPmodel.ModelFactory_FromFilename(STEPFileName, false)
 
@@ -464,15 +471,15 @@ Sub AssignSTEPmodel(STEPFileName, RotX, RotY, RotZ, X, Y, Z)
     Y = replace(Y,".",decChar)
     Z = replace(Z,".",decChar)
 
-    ' Устанавливаем параметры модели
+    ' Г“Г±ГІГ Г­Г ГўГ«ГЁГўГ ГҐГ¬ ГЇГ Г°Г Г¬ГҐГІГ°Г» Г¬Г®Г¤ГҐГ«ГЁ
     Model.SetState RotX,RotY,RotZ,mmstocoord(z)
     STEPmodel.Model = Model
 
-    ' Добавляем модель к текущему футпринту
+    ' Г„Г®ГЎГ ГўГ«ГїГҐГ¬ Г¬Г®Г¤ГҐГ«Гј ГЄ ГІГҐГЄГіГ№ГҐГ¬Гі ГґГіГІГЇГ°ГЁГ­ГІГі
     footprint.AddPCBObject(STEPmodel)
     DebugLog "[105] 3D model ADDED"
 
-    ' Позиционируем модель
+    ' ГЏГ®Г§ГЁГ¶ГЁГ®Г­ГЁГ°ГіГҐГ¬ Г¬Г®Г¤ГҐГ«Гј
     STEPmodel.MoveByXY mmstocoord(x), mmstocoord(y)
 
     
@@ -1040,6 +1047,9 @@ Sub ProcessCB(filename)
              SchComponent.Designator.Text = lineArray(3)
              SchComponent.ComponentDescription = lineArray(2)
              DebugLog "[208] Component parameters set"
+             SCHLib.AddSchComponent(SchComponent)
+             SCHLib.CurrentSchComponent = SchComponent
+             DebugLog "[209] Component added and set as current"
           End if
        ElseIf lineArray(0) = "CreateLeftPin" And AddSCH Then
           CreateLeftPin lineArray(1), lineArray(2), lineArray(3), lineArray(4), lineArray(5), CInt(lineArray(6)), CInt(lineArray(7))
@@ -1079,8 +1089,6 @@ Sub ProcessCB(filename)
     'FinaliseComponentInLib
     'Set SCHLib = SchServer.GetCurrentSchDocument
     If AddSCH Then
-       SCHLib.AddSchComponent(SchComponent)
-       DebugLog "[400] Component added to library"
     'Send a system notification that a new component has been added to the library.
        SchServer.RobotManager.SendMessage nil, c_BroadCast, SCHM_PrimitiveRegistration, SchComponent.I_ObjectAddress
     'SCHLib.CurrentSchComponent = SchComponent
@@ -1556,10 +1564,10 @@ Function AddSchLib(component)
     LibraryIterator.AddFilter_ObjectSet(MkSet(eSchComponent))
     Set LibComp = LibraryIterator.FirstSchObject
     
-    ' ВАЖНО: проверяем, есть ли хоть один компонент (библиотека может быть пустой)
+    ' Г‚ГЂГ†ГЌГЋ: ГЇГ°Г®ГўГҐГ°ГїГҐГ¬, ГҐГ±ГІГј Г«ГЁ ГµГ®ГІГј Г®Г¤ГЁГ­ ГЄГ®Г¬ГЇГ®Г­ГҐГ­ГІ (ГЎГЁГЎГ«ГЁГ®ГІГҐГЄГ  Г¬Г®Г¦ГҐГІ ГЎГ»ГІГј ГЇГіГ±ГІГ®Г©)
     If LibComp Is Nothing Then
         CurrentLib.SchIterator_Destroy(LibraryIterator)
-        AddSchLib = True  ' Библиотека пустая, можно добавлять
+        AddSchLib = True  ' ГЃГЁГЎГ«ГЁГ®ГІГҐГЄГ  ГЇГіГ±ГІГ Гї, Г¬Г®Г¦Г­Г® Г¤Г®ГЎГ ГўГ«ГїГІГј
         Exit Function
     End If
     
@@ -1569,16 +1577,16 @@ Function AddSchLib(component)
        LibCompNamePrev = LibCompNameNext
        If LibCompNameNext = component Then
           CurrentLib.SchIterator_Destroy(LibraryIterator)
-          AddSchLib = False  ' Компонент уже существует
+          AddSchLib = False  ' ГЉГ®Г¬ГЇГ®Г­ГҐГ­ГІ ГіГ¦ГҐ Г±ГіГ№ГҐГ±ГІГўГіГҐГІ
           Exit Function
        End If
        Set LibComp = LibraryIterator.NextSchObject
-       If LibComp Is Nothing Then Exit Do  ' Конец списка
+       If LibComp Is Nothing Then Exit Do  ' ГЉГ®Г­ГҐГ¶ Г±ГЇГЁГ±ГЄГ 
        LibCompNameNext = LibComp.LibReference
     Loop Until LibCompNameNext = LibCompNamePrev
     
     CurrentLib.SchIterator_Destroy(LibraryIterator)
-    AddSchLib = True  ' Компонент не найден, можно добавлять
+    AddSchLib = True  ' ГЉГ®Г¬ГЇГ®Г­ГҐГ­ГІ Г­ГҐ Г­Г Г©Г¤ГҐГ­, Г¬Г®Г¦Г­Г® Г¤Г®ГЎГ ГўГ«ГїГІГј
 End Function
 
 Sub chk_ShowInstructionClick(Sender)
