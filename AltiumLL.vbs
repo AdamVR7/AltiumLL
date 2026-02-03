@@ -453,7 +453,9 @@ Sub AssignSTEPmodel(STEPFileName, RotX, RotY, RotZ, X, Y, Z)
     Dim Model
     Dim PCBLib
     Dim footprint
+    Dim fso
 
+    Set fso = CreateObject("Scripting.FileSystemObject")
     Set PCBLib = PCBServer.GetCurrentPCBLibrary
     DebugLog "[101] STEP path=" & STEPFileName & " Rot=" & RotX & "/" & RotY & "/" & RotZ & " XYZ=" & X & "/" & Y & "/" & Z
     If PCBLib Is Nothing Then
@@ -470,6 +472,7 @@ Sub AssignSTEPmodel(STEPFileName, RotX, RotY, RotZ, X, Y, Z)
     ' Create STEP model and register it
     PCBServer.PreProcess
     Set STEPmodel = PCBServer.PCBObjectFactory(eComponentBodyObject,eNoDimension,eCreate_Default)
+    DebugLog "[325] STEPmodel is Nothing=" & (STEPmodel Is Nothing)
     Set Model = STEPmodel.ModelFactory_FromFilename(STEPFileName, false)
     If Model Is Nothing Then
         DebugLog "[ERROR] STEP model load failed: " & STEPFileName
@@ -488,6 +491,7 @@ Sub AssignSTEPmodel(STEPFileName, RotX, RotY, RotZ, X, Y, Z)
     STEPmodel.Model = Model
 
     ' Add model to footprint
+    DebugLog "[326] Attach to footprint=" & footprint.Name
     footprint.AddPCBObject(STEPmodel)
     PCBServer.SendMessageToRobots footprint.I_ObjectAddress,c_Broadcast,PCBM_BoardRegisteration,STEPmodel.I_ObjectAddress
     DebugLog "[105] 3D model ADDED"
@@ -515,6 +519,7 @@ Sub CreateComponentInLib(Name,Description,RefDes)
         MsgBox "Please open schematic library.", vbSystemModal, "Altium Library Loader"
         Exit Sub
     End If
+    DebugLog "[327] CurrentSchComponent before create=" & SCHLib.CurrentSchComponent.LibReference
 
     'Create a library component (a page of the library is created).
     Set SchComponent = SchServer.SchObjectFactory(eSchComponent, eCreate_Default)
@@ -530,9 +535,11 @@ Sub CreateComponentInLib(Name,Description,RefDes)
 
     'Define the LibReference and add the component to the library.
     SchComponent.LibReference = Name
+    DebugLog "[322] SchComponent LibReference=" & SchComponent.LibReference
 
     SchComponent.Designator.Text      = RefDes
     SchComponent.ComponentDescription = Description
+    DebugLog "[328] SchComponent Designator=" & SchComponent.Designator.Text
 
 
 End Sub
