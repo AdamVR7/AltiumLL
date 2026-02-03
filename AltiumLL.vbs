@@ -606,6 +606,12 @@ Sub CreateLeftPin(x, y, designator, name, length, pintype, pinnames)
     On Error Resume Next
 Dim apin
 
+If SchComponent Is Nothing Then
+    DebugLog "[ERROR 300] SchComponent is Nothing in CreateLeftPin. x=" & x & " y=" & y & " designator=" & designator & " name=" & name
+    MsgBox "ERROR: SchComponent is Nothing in CreateLeftPin", vbCritical
+    Exit Sub
+End If
+
 Set apin = SchServer.SchObjectFactory(ePin, eCreate_Default)
     If Err.Number <> 0 Then
         DebugLog "[ERROR 301] SchObjectFactory failed: " & Err.Description
@@ -650,6 +656,12 @@ Sub CreateRightPin(x, y, designator, name, length, pintype, pinnames)
     DebugLog "[300] CreateRightPin START: " & designator
     On Error Resume Next
 Dim apin
+
+If SchComponent Is Nothing Then
+    DebugLog "[ERROR 300] SchComponent is Nothing in CreateRightPin. x=" & x & " y=" & y & " designator=" & designator & " name=" & name
+    MsgBox "ERROR: SchComponent is Nothing in CreateRightPin", vbCritical
+    Exit Sub
+End If
 
 Set apin = SchServer.SchObjectFactory(ePin, eCreate_Default)
     If Err.Number <> 0 Then
@@ -696,6 +708,12 @@ Sub CreateTopPin(x, y, designator, name, length, pintype, pinnames)
     On Error Resume Next
 Dim apin
 
+If SchComponent Is Nothing Then
+    DebugLog "[ERROR 300] SchComponent is Nothing in CreateTopPin. x=" & x & " y=" & y & " designator=" & designator & " name=" & name
+    MsgBox "ERROR: SchComponent is Nothing in CreateTopPin", vbCritical
+    Exit Sub
+End If
+
 Set apin = SchServer.SchObjectFactory(ePin, eCreate_Default)
     If Err.Number <> 0 Then
         DebugLog "[ERROR 301] SchObjectFactory failed: " & Err.Description
@@ -740,6 +758,12 @@ Sub CreateBottomPin(x, y, designator, name, length, pintype, pinnames)
     DebugLog "[300] CreateBottomPin START: " & designator
     On Error Resume Next
 Dim apin
+
+If SchComponent Is Nothing Then
+    DebugLog "[ERROR 300] SchComponent is Nothing in CreateBottomPin. x=" & x & " y=" & y & " designator=" & designator & " name=" & name
+    MsgBox "ERROR: SchComponent is Nothing in CreateBottomPin", vbCritical
+    Exit Sub
+End If
 
 Set apin = SchServer.SchObjectFactory(ePin, eCreate_Default)
     If Err.Number <> 0 Then
@@ -1043,6 +1067,7 @@ Sub ProcessCB(filename)
            DebugLog "[LOOP] Iteration " & loopCounter
        End If
        lineArray = Split(f.ReadLine, ", ")
+       DebugLog "[CMD] #" & loopCounter & " cmd=" & lineArray(0) & " AddPCB=" & AddPCB & " AddSCH=" & AddSCH
        If lineArray(0) = "CreateFootprintInLib" Then
           AddPCB = AddPcbLib(lineArray(1))
           If Not AddPCB Then
